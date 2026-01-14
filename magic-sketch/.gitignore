@@ -1,0 +1,4 @@
+.env
+my_doodle_model_64.h5
+node_modules/
+__pycache__/

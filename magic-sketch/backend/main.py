@@ -5,11 +5,15 @@ import tensorflow as tf
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import google.generativeai as genai  # 안정적인 라이브러리
+import google.generativeai as genai
 from dotenv import load_dotenv
+# 👇 [수정] gTTS 대신 edge_tts 사용
+import edge_tts 
+from fastapi.responses import FileResponse
+import uuid
+import emoji
 
 # 1. .env 파일 로드
-# (같은 폴더에 있는 .env 파일을 찾아서 읽어옵니다)
 load_dotenv()
 
 app = FastAPI()
@@ -44,14 +48,11 @@ KOREAN_MAPPING = {
     "tree": "나무", "flower": "꽃"
 }
 
-# ==========================================
-# 🔑 API 키 설정 (.env에서 가져오기)
-# ==========================================
+# API 키 설정
 MY_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-# 키가 잘 가져와졌는지 터미널에 살짝 보여줌 (보안상 앞 5자리만)
 if not MY_API_KEY:
-    print("⚠️ [경고] .env 파일을 못 찾거나 키가 없습니다!")
+    print("⚠️ .env 파일을 못 찾거나 키가 없습니다!")
 else:
     print(f"🔑 API 키 로드 성공: {MY_API_KEY[:5]}*****")
 
@@ -101,28 +102,19 @@ async def predict_sketch(file: UploadFile = File(...)):
         processed_img = preprocess_image_64(contents)
         pred = MODEL.predict(processed_img)
         
-        # 1. 모든 확률을 높은 순서대로 쫘르륵 줄 세웁니다.
-        # (argsort는 낮은 순 정렬이라 [::-1]로 뒤집어서 높은 순으로 만듭니다)
         sorted_indices = np.argsort(pred[0])[::-1]
         
         candidates = []
-        
-        # 2. 순서대로 하나씩 꺼내서 검사합니다.
         for idx in sorted_indices:
-            # 이미 3개를 다 찾았으면 그만
             if len(candidates) >= 3:
                 break
-                
-            english_label = CLASSES[idx] 
-            
-            # 결과가 '사자(lion)'라면 -> 무시
+            english_label = CLASSES[idx]
             if english_label == "lion":
                 continue 
 
             confidence = float(pred[0][idx]) * 100
             korean_label = KOREAN_MAPPING.get(english_label, english_label)
             
-            # 리스트에 추가
             candidates.append({
                 "korean_label": korean_label,
                 "confidence": round(confidence, 1)
@@ -140,23 +132,64 @@ async def generate_story(req: StoryRequest):
     print(f"📝 동화 요청: {req.label}")
     try:
         prompt = f"""
-    당신은 다정하고 감수성이 풍부한 동화 작가입니다.
+    당신은 아이들을 위한 다정하고 감수성이 풍부한 동화 작가입니다.
     주제: '{req.label}'
 
-    1. '**' 같은 특수기호나 마크다운 형식을 절대 사용하지 마세요. (순수한 텍스트만 출력)
-    2. '제목:', '교훈:', '끝' 같은 딱딱한 라벨을 절대 붙이지 마세요.
-    3. 교훈은 마지막에 따로 요약하지 말고, 주인공의 대사나 이야기의 마무리에 자연스럽게 녹여내세요.
-    4. 문체: 부드러운 구어체(존댓말)를 사용하세요.
-    5. 분량: 100자 내외.
-    6. 읽기 쉽게 문단을 나누어 주세요.
-    7. 필요시 이모지를 사용해주세요.
-    8. 주인공에게 귀엽고 멋지고 예쁜 이름을 지어주세요
+    [작성 규칙]
+    1. 첫 줄: 반드시 주제에 어울리는 **10자 이내의 짧고 귀여운 제목**만 쓰세요. (예: 씩씩한 사자 레오, 춤추는 꽃송이)
+    2. 둘째 줄부터: 본문 내용을 작성하세요. (줄바꿈으로 제목과 본문을 구분합니다)
+    3. 본문 : 기승전결이 있는 100자 내외로, 아이들이 읽기 쉽게.
+    4. 주인공 이름: 주제에 어울리는 예쁜 이름을 지어주세요.
+    5. 문체: "해요"체의 부드러운 존댓말.
+    6. 특수기호: '**', '##' 같은 마크다운 문법 금지. 순수 텍스트만 출력, 필요한 경우 이모지 삽입.
+    7. 내용: 교훈을 억지로 넣지 말고, 이야기 속에 자연스럽게 녹여주세요.
     """
         
         response = gemini_model.generate_content(prompt)
-        print(" 동화 생성 성공!")
-        return {"story": response.text}
+        # 제목과 본문 분리 로직 (안전장치)
+        full_text = response.text.strip()
+        if "\n" in full_text:
+            title, story = full_text.split("\n", 1)
+            title = title.strip()
+            story = story.strip()
+        else:
+            title = f"{req.label} 이야기"
+            story = full_text
+
+        print("✅ 동화 생성 성공!")
+        return {"title": title, "story": story}
 
     except Exception as e:
         print(f"❌ [에러] AI 응답 실패: {e}")
-        return {"story": f"동화를 짓다가 실수를 했어요: {e}"}
+        return {"title": "잠시만요", "story": f"동화를 짓다가 실수를 했어요: {e}"}
+    
+    
+class TTSRequest(BaseModel):
+    text: str
+
+# TTS 생성
+@app.post("/tts")
+async def generate_tts(req: TTSRequest):
+    print(f"🗣️ 목소리 생성 요청: {req.text[:20]}...")
+    try:
+        # 1. 이모지 제거 (✨ -> 삭제)
+        # replace_emoji 함수가 텍스트에서 이모지만 찾아서 없애줍니다.
+        clean_text = emoji.replace_emoji(req.text, replace="")
+        
+        # 2. 불필요한 특수문자나 공백도 깔끔하게 정리 (선택사항)
+        clean_text = clean_text.strip()
+
+        # 한국어 예쁜 여자 목소리
+        VOICE = "ko-KR-SunHiNeural"
+        
+        filename = f"temp_voice_{uuid.uuid4()}.mp3"
+        
+        # 3. 깨끗해진 텍스트(clean_text)로 목소리 만들기
+        communicate = edge_tts.Communicate(clean_text, VOICE)
+        await communicate.save(filename)
+        
+        return FileResponse(filename, media_type="audio/mpeg", filename="story.mp3")
+
+    except Exception as e:
+        print(f"❌ TTS 에러: {e}")
+        return {"error": str(e)}

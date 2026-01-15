@@ -55,10 +55,6 @@ body {
   transition: transform 0.2s;
 }
 
-/* 마우스를 올리면 살짝 떠오르는 효과 */
-.canvas-wrapper:hover {
-  transform: translateY(-5px);
-}
 
 /* 캔버스 영역 커서 변경 */
 .canvas-wrapper canvas {
@@ -162,6 +158,34 @@ body {
   font-weight: bold;
   color: #333;
   margin-bottom: 5px;
+}
+
+/* App.css 맨 아래 추가 */
+
+/* TTS 읽어주기 버튼 */
+.tts-btn {
+  background-color: #FFD93D; /* 노란색 (주목성) */
+  color: #333;
+  border: 3px solid #FFD93D;
+}
+.tts-btn:hover {
+  background-color: #FFC300;
+}
+
+/* 멈춤 버튼 */
+.stop-btn {
+  background-color: #aaa;
+  color: white;
+  border: 3px solid #aaa;
+}
+.stop-btn:hover {
+  background-color: #888;
+}
+
+.tts-button-group {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
 }
 
 .candidate-conf { font-size: 0.9em; color: #666; }

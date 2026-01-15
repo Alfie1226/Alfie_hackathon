@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import CanvasDraw from "react-canvas-draw";
 import axios from "axios";
 import "./App.css";
@@ -8,14 +8,80 @@ function App() {
   
   const [candidates, setCandidates] = useState([]); 
   const [selectedLabel, setSelectedLabel] = useState(""); 
-  
-  // 👇 제목을 저장할 공간 추가!
   const [title, setTitle] = useState(""); 
   const [story, setStory] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isReading, setIsReading] = useState(false); // 🗣️ 읽고 있는지 확인하는 상태
+  const [audio, setAudio] = useState(null); // 🎵 오디오 파일 관리
 
   const CANVAS_WIDTH = 600;
   const CANVAS_HEIGHT = 450;
+
+  // 0. 목소리 설정 (초기화)
+  useEffect(() => {
+    // 페이지를 떠나거나 새로고침하면 말하던 거 멈춤
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  // 🗣️ [새로운] 예쁜 목소리로 읽어주기 (서버 요청)
+  const handleReadStory = async () => {
+    if (!story) return;
+    
+    // 이미 읽고 있는 게 있다면 멈춤
+    if (audio) {
+      audio.pause();
+      setIsReading(false);
+      return; // 버튼을 토글처럼 쓰기 위해 여기서 종료
+    }
+
+    try {
+      setLoading(true); // 로딩 표시 (파일 받아오는 동안)
+      
+      const safeTitle = title ? title : "";
+      const fullText = `${safeTitle}. \n ${story}`;
+
+      // 1. 백엔드에 MP3 달라고 요청
+      const response = await axios.post("http://127.0.0.1:8000/tts", {
+        text: fullText
+      }, {
+        responseType: 'blob' // 👈 중요! 파일(Blob)로 받겠다고 설정
+      });
+
+      // 2. 받은 파일을 오디오로 변환
+      const audioUrl = URL.createObjectURL(response.data);
+      const newAudio = new Audio(audioUrl);
+      
+      setAudio(newAudio); // 상태에 저장 (나중에 멈추려고)
+      setIsReading(true);
+
+      // 3. 재생 시작
+      newAudio.play();
+
+      // 4. 다 읽으면 상태 원상복구
+      newAudio.onended = () => {
+        setIsReading(false);
+        setAudio(null);
+      };
+
+    } catch (error) {
+      console.error("목소리 가져오기 실패:", error);
+      alert("목소리를 가져오지 못했어요 ㅠㅠ");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🔇 멈춤 함수
+  const handleStopReading = () => {
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0; // 처음으로 되감기
+      setAudio(null);
+    }
+    setIsReading(false);
+  };
 
   // 1. 분석 요청
   const handlePredict = async () => {
@@ -23,8 +89,9 @@ function App() {
     setLoading(true);
     setCandidates([]);
     setSelectedLabel("");
-    setTitle(""); // 초기화
+    setTitle(""); 
     setStory("");
+    handleStopReading(); // 분석 시작하면 말하기 중단
 
     const canvasData = canvasRef.current.getDataURL("png", false, "#ffffff");
     const res = await fetch(canvasData);
@@ -44,7 +111,7 @@ function App() {
     }
   };
 
-  // 2. 선택 후 동화 생성 (제목 + 내용 받아오기)
+  // 2. 선택 후 동화 생성
   const handleSelectAndStory = async (label) => {
     setSelectedLabel(label);
     setLoading(true);
@@ -54,7 +121,6 @@ function App() {
         label: label
       });
       
-      // 👇 서버에서 받은 제목과 내용을 각각 저장
       setTitle(response.data.title);
       setStory(response.data.story);
       
@@ -89,6 +155,7 @@ function App() {
             setSelectedLabel("");
             setTitle("");
             setStory("");
+            handleStopReading(); // 지우기 누르면 말하기도 멈춤
           }} 
           className="btn clear-btn">
           지우기 🗑️
@@ -96,7 +163,7 @@ function App() {
         
         {candidates.length === 0 && !story && (
           <button onClick={handlePredict} className="btn magic-btn" disabled={loading}>
-            {loading ? "분석 중... 🤔" : "다 그렸어요! (정답 맞추기) ✨"}
+            {loading ? "분석 중... 🤔" : "다 그렸어요! ✨"}
           </button>
         )}
       </div>
@@ -127,17 +194,31 @@ function App() {
           <div className="story-box">
             <p>{story}</p>
           </div>
+
+          {/* 📢 읽어주기 버튼 추가! */}
+          <div className="tts-button-group" style={{ marginTop: "15px", marginBottom: "15px" }}>
+            {!isReading ? (
+              <button className="btn tts-btn" onClick={handleReadStory}>
+                📖 읽어주세요!
+              </button>
+            ) : (
+              <button className="btn stop-btn" onClick={handleStopReading}>
+                🤫 그만 읽어주세요!
+              </button>
+            )}
+          </div>
+
           <button 
             className="btn magic-btn" 
-            style={{marginTop: '20px'}}
             onClick={() => {
               setCandidates([]);
               setSelectedLabel("");
               setTitle("");
               setStory("");
+              handleStopReading(); // 다시하기 누르면 멈춤
               canvasRef.current.clear();
             }}>
-            또 하기 🔄
+            또 하기
           </button>
         </div>
       )}

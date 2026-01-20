@@ -1,0 +1,39 @@
+# ======================
+# OS / Editor
+# ======================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ======================
+# Backend (FastAPI)
+# ======================
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/cache/
+backend/voices/
+backend/models/
+backend/debug_inputs/
+backend/.env
+backend/*.pyc
+backend/**/*.pyc
+
+# ======================
+# Frontend (Vite + React)
+# ======================
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.*
+frontend/src/.env
+frontend/.env
+frontend/.env.*
+frontend/src/App_old.jsx
+
+# ======================
+# Stable Diffusion WebUI
+# ======================
+stable-diffusion-webui/

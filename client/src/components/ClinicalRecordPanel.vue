@@ -65,9 +65,6 @@
               placeholder="임상 관찰 소견, 감별 진단, 판독 노트를 입력하세요..."
               :disabled="isSubmitted"
             />
-            <div class="mt-2 text-[11px] text-slate-500">
-              팁: 핵심 증상·발생 시간·유발 요인·상관관계를 한 줄씩 적으면 좋아요.
-            </div>
 
             <!-- ✅ 제출 완료 상태 안내 -->
             <div v-if="isSubmitted" class="mt-2 text-[11px] text-emerald-700 font-semibold">

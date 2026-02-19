@@ -187,6 +187,10 @@ export const useWorkspaceStore = defineStore("workspace", {
     /** ✅ 생성된 리포트 */
     reportSet: null as ReportSet | null,
 
+    /** ✅ 추가: 리포트 저장 상태(UI 표시용) */
+    reportSaveStatus: "IDLE" as "IDLE" | "SAVING" | "SAVED" | "ERROR",
+    reportSaveMessage: "" as string,
+
     /** ✅ 추가: 임상기록 임시저장/제출 데이터(데모용 저장소) */
     clinicalNotesByPatient: {} as Record<
       string,
@@ -234,11 +238,16 @@ export const useWorkspaceStore = defineStore("workspace", {
     openReportBuilder() {
       this.mode = "DIAGNOSIS";
       this.viewMode = "REPORT";
-      this.generateReportDraft();
+
+      // ✅ 이미 reportSet(편집본 포함)이 있으면 재생성하지 않음(덮어쓰기 방지)
+      if (!this.reportSet) this.generateReportDraft();
     },
 
     /** ✅ (중요) 분석 화면 복귀 */
-    closeReportBuilder() {
+    async closeReportBuilder() {
+      // ✅ 닫기 전에 저장 시도(백 붙이면 여기서 서버 저장됨)
+      await this.saveReportDraft();
+
       this.mode = "READING";
       this.viewMode = "ANALYSIS";
     },
@@ -247,36 +256,43 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.selectedPatientId = patientId;
       const firstEvent = this.currentEvents[0];
       this.selectedEventId = firstEvent ? firstEvent._id : "";
+
+      // ✅ 환자 바뀌면 이전 환자의 리포트를 유지하지 않음(단일 슬롯 방식)
+      this.reportSet = null;
+      this.reportSaveStatus = "IDLE";
+      this.reportSaveMessage = "";
     },
 
     selectEvent(eventId: string) {
       this.selectedEventId = eventId;
     },
 
+    /** ✅ 초안 생성 */
     generateReportDraft() {
-  const events = this.currentEvents ?? [];
+      const events = this.currentEvents ?? [];
 
-  const afCount = events.filter((e: any) => safeUpper(e.event_type_id).includes("AF")).length;
-  const pauseCount = events.filter((e: any) => safeUpper(e.event_type_id).includes("PAUSE")).length;
+      const vtCount = events.filter((e: any) => safeUpper(e.event_type_id).includes("VT")).length;
+      const afCount = events.filter((e: any) => safeUpper(e.event_type_id).includes("AF")).length;
+      const pauseCount = events.filter((e: any) => safeUpper(e.event_type_id).includes("PAUSE")).length;
 
-  const ctx = {
-    patient: this.selectedPatient,
-    periodText: "2025-02-10 08:40 - 2025-02-11 08:50 (24h 10m)",
-    afCount,
-    pauseCount,
-  };
+      const ctx = {
+        patient: this.selectedPatient,
+        periodText: "2025-02-10 08:40 - 2025-02-11 08:50 (24h 10m)",
+        vtCount,
+        afCount,
+        pauseCount,
+      };
 
-  const input = this.reportInput;
+      const input = this.reportInput;
 
-  this.reportSet = {
-    report_id: this.reportSet?.report_id ?? makeId(),
-    input: { ...input },
-    draft_ko: buildKoDraft(input, ctx),
-    draft_en: buildEnDraft(input, ctx),
-    updated_at: nowIso(),
-  };
-},
-
+      this.reportSet = {
+        report_id: this.reportSet?.report_id ?? makeId(),
+        input: { ...input },
+        draft_ko: buildKoDraft(input, ctx),
+        draft_en: buildEnDraft(input, ctx),
+        updated_at: nowIso(),
+      };
+    },
 
     regenerateReportDraft() {
       if (!this.reportSet) return this.generateReportDraft();
@@ -285,8 +301,84 @@ export const useWorkspaceStore = defineStore("workspace", {
       if (this.reportSet) this.reportSet.report_id = keepId;
     },
 
+    // ======================================================
+    // ✅ 리포트 "수동 편집" 저장이 안 남는 문제 해결(핵심)
+    // ======================================================
+
+    /** ✅ (백 붙기 전) 저장 시 오른쪽(영문)도 같이 보이게: draft_en을 draft_ko로 동기화 */
+    tempSaveReportDraftBoth(draft_ko: string) {
+      if (!this.reportSet) {
+        this.generateReportDraft();
+        if (!this.reportSet) return;
+      }
+
+      const ko = draft_ko ?? "";
+
+      this.reportSet = {
+        ...this.reportSet,
+        draft_ko: ko,
+        // ✅ 지금은 번역이 아니라 "저장된 내용이 오른쪽에도 보이게" 하는 목적
+        draft_en: ko,
+        updated_at: nowIso(),
+      };
+    },
+
+    /** ✅ 리포트 임시저장(백 연결 전: 동작/흐름만 제공) */
+    async saveReportDraft() {
+      if (!this.reportSet) {
+        this.reportSaveStatus = "ERROR";
+        this.reportSaveMessage = "저장할 리포트가 없습니다.";
+        return false;
+      }
+
+      this.reportSaveStatus = "SAVING";
+      this.reportSaveMessage = "저장 중…";
+
+      try {
+        // TODO: 백 연결 시 여기만 교체하면 끝
+        // await api.post("/reports/draft", {
+        //   patientId: this.selectedPatientId,
+        //   sessionId: this.currentSession?._id,
+        //   eventId: this.selectedEventId, // 필요하면
+        //   reportId: this.reportSet.report_id,
+        //   input: this.reportSet.input,
+        //   draft_ko: this.reportSet.draft_ko,
+        //   draft_en: this.reportSet.draft_en,
+        //   updated_at: this.reportSet.updated_at,
+        // });
+
+        // ✅ 지금은 "저장되는 척"만: UI/흐름 확인용
+        await new Promise((r) => setTimeout(r, 250));
+
+        this.reportSaveStatus = "SAVED";
+        this.reportSaveMessage = "임시저장 완료";
+        return true;
+      } catch (e) {
+        this.reportSaveStatus = "ERROR";
+        this.reportSaveMessage = "저장 실패";
+        return false;
+      }
+    },
+
+    /** ✅ 리포트 최종 확정(데모): 일단 draft_ko 반영 (원하면 여기서도 Both + save로 바꿔도 됨) */
+    finalizeReport(draft_ko: string) {
+      if (!this.reportSet) {
+        this.generateReportDraft();
+        if (!this.reportSet) return;
+      }
+
+      this.reportSet = {
+        ...this.reportSet,
+        draft_ko: draft_ko ?? "",
+        updated_at: nowIso(),
+      };
+
+      // TODO: 나중에 API 붙일 자리
+      // await api.post("/reports/finalize", { reportId: this.reportSet.report_id, draft_ko })
+    },
+
     // ===========================
-    // ✅ 여기부터 "검토 제출" 기능 추가
+    // ✅ 여기부터 "검토 제출" 기능
     // ===========================
 
     /** ✅ reviewed=true로 변경 (검토대기에서 빠지게) */
@@ -296,7 +388,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       target.reviewed = true;
     },
 
-    /** ✅ ClinicalRecordPanel.vue에서 쓰는 임시저장 함수 (없어서 콘솔만 찍던 부분 해결) */
+    /** ✅ ClinicalRecordPanel.vue에서 쓰는 임시저장 함수 */
     tempSaveClinicalRecord(payload: ClinicalReviewPayload) {
       const pid = payload.patientId || this.selectedPatientId;
       if (!pid) return;
@@ -309,10 +401,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       };
     },
 
-    /**
-     * ✅ ClinicalRecordPanel.vue에서 쓰는 "검토 제출" 함수
-     * - 임시 저장 + submitted 처리 + reviewed=true 처리까지 한번에
-     */
+    /** ✅ "검토 제출" 함수 */
     submitClinicalReview(payload: ClinicalReviewPayload) {
       const pid = payload.patientId || this.selectedPatientId;
       if (!pid) return;
@@ -324,14 +413,11 @@ export const useWorkspaceStore = defineStore("workspace", {
         submitted: true,
       };
 
-      // ✅ 핵심: 검토 제출 시 reviewed=true
       this.markReviewed(pid);
 
-      // ✅ 나중에 API 붙일 자리
-      // await api.post("/clinical-reviews/submit", { ...payload, sessionId: this.currentSession?._id })
+      // TODO: API 붙일 자리
     },
 
-    /** (선택) 버튼에서 그냥 쓰고 싶으면: store.submitReview() */
     submitReview() {
       const pid = this.selectedPatientId;
       if (!pid) return;
@@ -340,11 +426,9 @@ export const useWorkspaceStore = defineStore("workspace", {
 
     /** ✅ 제출 완료 → 다시 수정 가능하게(제출 취소) */
     reopenClinicalReview(patientId: string) {
-      // 1) reviewed 상태 되돌리기
       const target = this.patients.find((p) => p._id === patientId);
       if (target) target.reviewed = false;
 
-      // 2) 임상기록 저장소도 submitted=false로 되돌리기(선택이지만 권장)
       const saved = this.clinicalNotesByPatient[patientId];
       if (saved) {
         this.clinicalNotesByPatient[patientId] = {

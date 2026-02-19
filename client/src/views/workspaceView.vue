@@ -9,9 +9,11 @@
           <div class="text-xs text-slate-500">현재 상태:</div>
           <span
             class="text-sm px-3 py-1 rounded-full border"
-            :class="store.mode === 'DIAGNOSIS'
-              ? 'bg-violet-50 text-violet-700 border-violet-200'
-              : 'bg-slate-100 text-slate-700 border-slate-200'"
+            :class="
+              store.mode === 'DIAGNOSIS'
+                ? 'bg-violet-50 text-violet-700 border-violet-200'
+                : 'bg-slate-100 text-slate-700 border-slate-200'
+            "
           >
             {{ store.mode === "DIAGNOSIS" ? "진단모드" : "판독모드" }}
           </span>
@@ -50,9 +52,7 @@
     <div
       class="h-[calc(100vh-56px)] grid"
       :style="{
-        gridTemplateColumns: isLeftCollapsed
-          ? '0px minmax(0,1fr) 360px'
-          : '320px minmax(0,1fr) 360px'
+        gridTemplateColumns: isLeftCollapsed ? '0px minmax(0,1fr) 360px' : '320px minmax(0,1fr) 360px',
       }"
     >
       <!-- Left -->
@@ -115,7 +115,7 @@
                     <div class="font-semibold text-slate-900 truncate">
                       {{ p.name }}
                       <span class="font-medium text-slate-500">
-                        ({{ genderShort(p) }}{{ ageText(p) ? '/' + ageText(p) : '' }})
+                        ({{ genderShort(p) }}{{ ageText(p) ? "/" + ageText(p) : "" }})
                       </span>
                     </div>
                   </div>
@@ -144,14 +144,14 @@
                   <span>{{ sessionDateText(p) }}</span>
                 </div>
 
-                <!-- ✅ 이벤트 칩: ANALYSIS 화면일 때만 morphology로 이동 가능 -->
+                <!-- ✅ 이벤트 칩: Morphology 대상 4개(AF/PAC/PVC/Pause)만 -->
                 <div class="mt-2 flex flex-wrap gap-2">
                   <template v-for="chip in eventChips(p)" :key="chip.key">
                     <button
                       type="button"
                       class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs border hover:brightness-[0.98]"
                       :class="chipClass(chip.key)"
-                      @click.stop="onClickEventChip(chip.key as any)"
+                      @click.stop="onClickEventChip(chip.key)"
                       :disabled="store.viewMode !== 'ANALYSIS'"
                       :title="store.viewMode !== 'ANALYSIS' ? '리포트 작성 중에는 이동할 수 없습니다' : '형태학적 분석으로 보기'"
                     >
@@ -195,124 +195,100 @@
 
       <!-- Center -->
       <main class="relative overflow-y-auto bg-slate-50 pl-[18px]">
-        <!-- 토글 버튼: 센터 왼쪽 경계선(=검은 영역 시작)에 붙여서 표시 -->
+        <!-- 토글 버튼: 센터 왼쪽 경계선에 붙여서 표시 -->
         <button
           type="button"
           class="absolute top-1/2 -translate-y-1/2 left-0 translate-x-[1px] z-40
-                 h-7 w-7 rounded-md border border-slate-300 bg-white shadow-sm
-                 hover:bg-slate-50"
+                 h-7 w-7 rounded-md border border-slate-300 bg-white shadow-sm hover:bg-slate-50"
           :title="isLeftCollapsed ? '왼쪽 패널 펼치기' : '왼쪽 패널 접기'"
           @click="toggleLeft()"
         >
-          <svg
-            v-if="isLeftCollapsed"
-            viewBox="0 0 24 24"
-            class="h-4 w-4 text-slate-700 mx-auto"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
+          <svg v-if="isLeftCollapsed" viewBox="0 0 24 24" class="h-4 w-4 text-slate-700 mx-auto" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M9 18l6-6-6-6" />
           </svg>
-          <svg
-            v-else
-            viewBox="0 0 24 24"
-            class="h-4 w-4 text-slate-700 mx-auto"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
+          <svg v-else viewBox="0 0 24 24" class="h-4 w-4 text-slate-700 mx-auto" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
 
         <!-- ✅ 센터 스위칭 -->
         <template v-if="store.viewMode === 'ANALYSIS'">
-          <!-- ✅ 여기서만 morphology/24h 전환 -->
           <template v-if="vm.viewMode === 'ANALYSIS_24H'">
             <div class="p-4">
-  <div class="flex items-start justify-between">
-    <div>
-      <div class="text-xl font-semibold">24시간 ECG 분석</div>
-      <div class="text-sm text-slate-500 mt-1">
-        환자: {{ store.selectedPatient?.name || "-" }}
-        · 세션: {{ store.currentSession?._id || "-" }}
-      </div>
-    </div>
+              <div class="flex items-start justify-between">
+                <div>
+                  <div class="text-xl font-semibold">24시간 ECG 분석</div>
+                  <div class="text-sm text-slate-500 mt-1">
+                    환자: {{ store.selectedPatient?.name || "-" }}
+                    · 세션: {{ store.currentSession?._id || "-" }}
+                  </div>
+                </div>
 
-    <div class="text-sm text-slate-500">
-      분석 상태:
-      <span class="inline-flex items-center px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-        AI 처리 완료
-      </span>
-    </div>
-  </div>
+                <div class="text-sm text-slate-500">
+                  분석 상태:
+                  <span class="inline-flex items-center px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    AI 처리 완료
+                  </span>
+                </div>
+              </div>
 
-  <!-- ✅ 1️⃣ 상단 6개 카드 -->
-  <div class="mt-6 grid grid-cols-6 gap-4">
-    <div class="bg-white rounded-xl border p-4 shadow-sm">
-      <div class="text-xs text-slate-500">평균 HR</div>
-      <div class="text-2xl font-semibold mt-1">72</div>
-      <div class="text-xs text-slate-400">bpm</div>
-    </div>
+              <!-- ✅ 1️⃣ 상단 6개 카드 -->
+              <div class="mt-6 grid grid-cols-6 gap-4">
+                <div class="bg-white rounded-xl border p-4 shadow-sm">
+                  <div class="text-xs text-slate-500">평균 HR</div>
+                  <div class="text-2xl font-semibold mt-1">72</div>
+                  <div class="text-xs text-slate-400">bpm</div>
+                </div>
 
-    <div class="bg-white rounded-xl border p-4 shadow-sm">
-      <div class="text-xs text-slate-500">HR 범위</div>
-      <div class="text-2xl font-semibold mt-1">45-142</div>
-      <div class="text-xs text-slate-400">bpm</div>
-    </div>
+                <div class="bg-white rounded-xl border p-4 shadow-sm">
+                  <div class="text-xs text-slate-500">HR 범위</div>
+                  <div class="text-2xl font-semibold mt-1">45-142</div>
+                  <div class="text-xs text-slate-400">bpm</div>
+                </div>
 
-    <div class="bg-white rounded-xl border p-4 shadow-sm">
-      <div class="text-xs text-slate-500">PR 간격</div>
-      <div class="text-2xl font-semibold mt-1">168</div>
-      <div class="text-xs text-slate-400">ms</div>
-    </div>
+                <div class="bg-white rounded-xl border p-4 shadow-sm">
+                  <div class="text-xs text-slate-500">PR 간격</div>
+                  <div class="text-2xl font-semibold mt-1">168</div>
+                  <div class="text-xs text-slate-400">ms</div>
+                </div>
 
-    <div class="bg-white rounded-xl border p-4 shadow-sm">
-      <div class="text-xs text-slate-500">QRS 폭</div>
-      <div class="text-2xl font-semibold mt-1">92</div>
-      <div class="text-xs text-slate-400">ms</div>
-    </div>
+                <div class="bg-white rounded-xl border p-4 shadow-sm">
+                  <div class="text-xs text-slate-500">QRS 폭</div>
+                  <div class="text-2xl font-semibold mt-1">92</div>
+                  <div class="text-xs text-slate-400">ms</div>
+                </div>
 
-    <div class="bg-white rounded-xl border p-4 shadow-sm">
-      <div class="text-xs text-slate-500">QTc</div>
-      <div class="text-2xl font-semibold mt-1">438</div>
-      <div class="text-xs text-slate-400">ms</div>
-    </div>
+                <div class="bg-white rounded-xl border p-4 shadow-sm">
+                  <div class="text-xs text-slate-500">QTc</div>
+                  <div class="text-2xl font-semibold mt-1">438</div>
+                  <div class="text-xs text-slate-400">ms</div>
+                </div>
 
-    <div class="bg-white rounded-xl border p-4 shadow-sm">
-      <div class="text-xs text-slate-500">AF 부담률</div>
-      <div class="text-2xl font-semibold mt-1 text-orange-500">2.3</div>
-      <div class="text-xs text-slate-400">%</div>
-    </div>
-  </div>
+                <div class="bg-white rounded-xl border p-4 shadow-sm">
+                  <div class="text-xs text-slate-500">AF 부담률</div>
+                  <div class="text-2xl font-semibold mt-1 text-orange-500">2.3</div>
+                  <div class="text-xs text-slate-400">%</div>
+                </div>
+              </div>
 
-  <!-- ✅ 2️⃣ 고위험 임상 소견 -->
-  <div class="mt-6 bg-red-50 border border-red-200 rounded-xl p-5">
-    <div class="font-semibold text-red-600 mb-2">
-      ⚠ 고위험 임상 소견
-    </div>
-    <div class="text-sm text-red-600 leading-relaxed">
-      비지속성 심실빈맥 18회 에피소드 감지.
-      최대 심박수 168 bpm 기록.
-      최장 지속 시간 8.1초.
-      즉각적인 임상 검토가 권장됩니다.
-    </div>
-  </div>
+              <!-- ✅ 2️⃣ 고위험 임상 소견 -->
+              <div class="mt-6 bg-red-50 border border-red-200 rounded-xl p-5">
+                <div class="font-semibold text-red-600 mb-2">⚠ 고위험 임상 소견</div>
+                <div class="text-sm text-red-600 leading-relaxed">
+                  비지속성 심실빈맥 18회 에피소드 감지. 최대 심박수 168 bpm 기록.
+                  최장 지속 시간 8.1초. 즉각적인 임상 검토가 권장됩니다.
+                </div>
+              </div>
 
-  <!-- 기존 타임라인 -->
-  <CompressedTimelineCard class="mt-6" />
-</div>
-
+              <CompressedTimelineCard class="mt-6" />
+            </div>
           </template>
 
           <template v-else>
-            <!-- ✅ Morphology 화면은 센터에서만 띄움 (오른쪽 패널 유지됨) -->
             <MorphologyAnalysisView />
           </template>
         </template>
 
-        <!-- Report Builder -->
         <template v-else>
           <ReportBuilderCenter />
         </template>
@@ -327,7 +303,6 @@
       </template>
     </div>
 
-    <!-- ✅ 센터만 덮는 과거기록 모달 -->
     <PastHistoryModal
       :open="pastOpen"
       :patientName="store.selectedPatient?.name ?? '-'"
@@ -456,22 +431,31 @@ function sessionDateText(p: any) {
   return p?.session?.date || p?.date || "";
 }
 
+/** ✅ 칩 컬러: Morphology 대상 4개만 */
 function chipClass(key: string) {
-  if (key === "VT") return "bg-red-50 text-red-700 border-red-200";
   if (key === "AF") return "bg-orange-50 text-orange-700 border-orange-200";
+  if (key === "PAC") return "bg-violet-50 text-violet-700 border-violet-200";
   if (key === "Pause") return "bg-amber-50 text-amber-800 border-amber-200";
-  return "bg-sky-50 text-sky-700 border-sky-200";
+  if (key === "PVC") return "bg-sky-50 text-sky-700 border-sky-200";
+  return "bg-slate-50 text-slate-700 border-slate-200";
 }
 
+/** ✅ 이벤트 칩: Morphology 대상 4개(AF/PAC/PVC/Pause)만 만들고, 0이면 숨김 */
 function eventChips(p: any) {
   const c = p?.counts || p?.events || p?.stats || {};
   const chips = [
-    { key: "VT", label: "VT", count: Number(c?.VT) || 0 },
-    { key: "AF", label: "AF", count: Number(c?.AF) || 0 },
-    { key: "Pause", label: "Pause", count: Number(c?.Pause) || 0 },
-    { key: "PVC", label: "PVC", count: Number(c?.PVC) || 0 },
+    { key: "AF" as const, label: "AF", count: Number(c?.AF) || 0 },
+    { key: "PAC" as const, label: "PAC", count: Number(c?.PAC) || 0 },
+    { key: "PVC" as const, label: "PVC", count: Number(c?.PVC) || 0 },
+    { key: "Pause" as const, label: "Pause", count: Number(c?.Pause) || 0 },
   ];
   return chips.filter((x) => x.count > 0);
+}
+
+/** ✅ 이벤트 칩 클릭 → morphology로 이동(센터만) + 타입 선택 */
+function onClickEventChip(key: "AF" | "PAC" | "PVC" | "Pause") {
+  if (store.viewMode !== "ANALYSIS") return;
+  vm.openMorphology(key as any);
 }
 
 const filteredAndSortedPatients = computed(() => {
@@ -509,15 +493,6 @@ const reviewPendingCount = computed(() => {
 
 function onClickHeaderUser() {
   console.log("헤더 사용자 클릭");
-}
-
-/** ✅ 이벤트 칩 클릭 → morphology로 이동(센터만) + 타입 선택 */
-function onClickEventChip(key: "VT" | "AF" | "Pause" | "PVC") {
-  if (store.viewMode !== "ANALYSIS") return;
-
-  // Morphology 쪽 타입은 EventTypeId: "VT" | "AF" | "PAUSE" | "PVC"
-  const eventTypeId = key === "Pause" ? "PAUSE" : key;
-  vm.openMorphology(eventTypeId as any);
 }
 
 /** ✅ 과거 기록 모달 */
